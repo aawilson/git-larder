@@ -1,12 +1,27 @@
+"""
+Copyright 2016 Aaron Wilson and Habla, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+"""
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import atexit
 import os
-
-from atexit import register
-from unittest import TestCase, main
-from tempfile import mkdtemp
-from time import sleep
+import tempfile
+import time
+import unittest
+import shutil
 
 try:
     import json as json
@@ -14,7 +29,6 @@ except ImportError:
     import json
 
 from git import Repo
-from shutil import copy, copytree, rmtree
 from git_larder import GitRecord, GitRecordFactory, ModelIgnored, NoResultFound
 
 
@@ -23,7 +37,7 @@ temp_path = None
 
 def maybe_make_test_repo():
     global temp_path
-    temp_path = temp_path or mkdtemp()
+    temp_path = temp_path or tempfile.mkdtemp()
     fixtures_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'test_repo')
     test_repo_path = os.path.join(temp_path, 'test_repo')
     test_repo = Repo.init(test_repo_path)
@@ -34,7 +48,7 @@ def maybe_make_test_repo():
         fullname = os.path.join(fixtures_path, filename)
         dstname = os.path.join(test_repo_path, filename)
         if os.path.isfile(fullname):
-            copy(fullname, dstname)
+            shutil.copy(fullname, dstname)
     test_repo.index.add(['.'])
     test_repo.index.commit("Initialize test database")
 
@@ -43,14 +57,14 @@ def maybe_make_test_repo():
         fullname = os.path.join(fixtures_path, filename)
         dstname = os.path.join(test_repo_path, filename)
         if os.path.isdir(fullname):
-            copytree(fullname, dstname)
+            shutil.copytree(fullname, dstname)
 
     test_repo.index.add(['ignored_model', 'ignored_model/*', '.gitrecord_ignore'])
     test_repo.index.commit("Second commit, adds actual files")
     test_repo.index.add(['test_model', 'test_model/*'])
     test_repo.index.commit("Third commit, adds model")
 
-    sleep(1)  # To ensure commit time changes
+    time.sleep(1)  # To ensure commit time changes
     blob = test_repo.head.commit.tree['test_model/test_record_one.json']
     json_blob = json.load(blob.data_stream)
     json_blob['a_changed_attribute'] = 'some_changed_value'
@@ -64,14 +78,14 @@ def maybe_make_test_repo():
 def maybe_unmake_test_repo():
     global temp_path
     if temp_path:
-        rmtree(temp_path)
+        shutil.rmtree(temp_path)
         temp_path = None
 
 
-register(maybe_unmake_test_repo)
+atexit.register(maybe_unmake_test_repo)
 
 
-class GitLarderTest(TestCase):
+class GitLarderTest(unittest.TestCase):
     def setUp(self):
         self._test_repo, self._test_repo_path = maybe_make_test_repo()
         self._test_repo_commit = self._test_repo.commit('HEAD')
@@ -249,4 +263,4 @@ class InMemoryCacheTest(GitLarderTest):
 
 
 if __name__ == '__main__':
-    main()
+    unittest.main()

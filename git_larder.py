@@ -1,15 +1,32 @@
+"""
+Copyright 2016 Aaron Wilson and Habla, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+"""
 from __future__ import print_function
 from __future__ import unicode_literals
 
 import binascii
-import git
-import gitdb
 import os
 
 try:
     import simplejson as json
 except ImportError:
     import json
+
+from git import Repo, Git
+from git.objects.blob import Blob
+from gitdb.exc import BadObject
 
 
 class NoResultFound(KeyError):
@@ -37,8 +54,8 @@ def _load_record_from_blob(blob, commit):
 
 class GitRecordFactory(object):
     def __init__(self, repo_location, no_result_found_error_class=None):
-        self._repo = git.Repo(repo_location)
-        self._git = git.Git(repo_location)
+        self._repo = Repo(repo_location)
+        self._git = Git(repo_location)
         self._no_result_found = no_result_found_error_class or NoResultFound
         try:
             self._ignored = [line.strip() for line in self._repo.head.commit.tree['.gitrecord_ignore'].data_stream.read().split('\n')]
@@ -113,10 +130,10 @@ class GitRecordFactory(object):
         if version:
             try:
                 # load directly from the object database, to save us a search if it doesn't exist
-                test_blob = git.objects.blob.Blob(self._repo, binascii.a2b_hex(version))
+                test_blob = Blob(self._repo, binascii.a2b_hex(version))
                 test_blob.data_stream  # Throws an error if the blob isn't in the repo
 
-            except gitdb.exc.BadObject:
+            except BadObject:
                 raise self._no_result_found("No record found of that version")
 
             # Search in the list of all versions for this particular sha
