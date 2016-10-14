@@ -1,0 +1,13 @@
+{
+    "test_string_attribute": "test_string_value",
+    "test_boolean_attribute": true,
+    "test_integer_attribute": 3,
+    "test_list_attribute": [
+        "test_list_value_1",
+        "test_list_value_2"
+    ],
+    "test_dict_attribute": {
+        "test_dict_subattribute_1": "one",
+        "test_dict_subattribute_2": "two"
+    }
+}
