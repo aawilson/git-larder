@@ -32,12 +32,23 @@ from git import Repo
 from git_larder import GitRecord, GitRecordFactory, ModelIgnored, NoResultFound
 
 
-temp_path = None
+class GlobalTestState(object):
+    temp_path = None
+    test_repo = None
+    test_repo_path = None
+
+    object_cache = None
+    id_to_ref_map = None
+
+
+gts = GlobalTestState()
 
 
 def maybe_make_test_repo():
-    global temp_path
-    temp_path = temp_path or tempfile.mkdtemp()
+    if gts.temp_path:
+        return gts.test_repo, gts.test_repo_path
+
+    temp_path = gts.temp_path or tempfile.mkdtemp()
     fixtures_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'test_repo')
     test_repo_path = os.path.join(temp_path, 'test_repo')
     test_repo = Repo.init(test_repo_path)
@@ -72,14 +83,15 @@ def maybe_make_test_repo():
     test_repo.index.add(['test_model/test_record_one.json'])
     test_repo.index.commit('Commit after create')
 
+    gts.temp_path, gts.test_repo, gts.test_repo_path = temp_path, test_repo, test_repo_path
+
     return test_repo, test_repo_path
 
 
 def maybe_unmake_test_repo():
-    global temp_path
-    if temp_path:
-        shutil.rmtree(temp_path)
-        temp_path = None
+    if gts.temp_path:
+        shutil.rmtree(gts.temp_path)
+        gts.temp_path = None
 
 
 atexit.register(maybe_unmake_test_repo)
@@ -89,12 +101,12 @@ class GitLarderTest(unittest.TestCase):
     def setUp(self):
         self._test_repo, self._test_repo_path = maybe_make_test_repo()
         self._test_repo_commit = self._test_repo.commit('HEAD')
-        self._test_datastore = GitRecordFactory(self._test_repo)
+        self._test_datastore = GitRecordFactory(self._test_repo_path)
         self._test_model = self._test_datastore.get_model("test_model")
         self._test_model.attach_to_datastore(self._test_datastore)
 
     def tearDown(self):
-        self._test_repo.heads('master').reset(self._test_repo_commit, working_tree=True)
+        self._test_repo.head.reset(self._test_repo_commit, working_tree=True)
 
     def timestamps_exist_test(self):
         for r in self._test_datastore.all(self._test_model):
@@ -121,7 +133,7 @@ class GitLarderTest(unittest.TestCase):
             __modelname__ = 'ignored_model'
 
         with self.assertRaises(ModelIgnored):
-            self._test_datastore.find(ModelIgnored, 'ignored_file')
+            self._test_datastore.find(IgnoredModel, 'ignored_file')
 
     def find_by_nonexistent_id_test(self):
         with self.assertRaises(NoResultFound):
@@ -175,13 +187,17 @@ class GitLarderTest(unittest.TestCase):
         test_record_one = self._test_model.find('test_record_one')
 
         self.assertIsNotNone(
-            self._test_model.find('test_record_one'),
-            version=test_record_one['version'],
+            self._test_model.find(
+                'test_record_one',
+                version=test_record_one['version'],
+            )
         )
 
 
-def GitLarderVersionComparisonTests(GitLarderTest):
+class GitLarderVersionComparisonTest(GitLarderTest):
     def setUp(self):
+        super(GitLarderVersionComparisonTest, self).setUp()
+
         self._test_record_one_all_versions = self._test_model.find(
             'test_record_one',
             all_versions=True)
@@ -213,28 +229,29 @@ def GitLarderVersionComparisonTests(GitLarderTest):
 
 class InMemoryCacheTest(GitLarderTest):
     def setUp(self):
+        super(InMemoryCacheTest, self).setUp()
 
-        if not self.__class__._object_cache:
-            self.__class__._object_cache, self.__class__._id_to_ref_map = self._test_model.build_object_cache()
+        if not gts.object_cache:
+            gts.object_cache, gts.id_to_ref_map = self._test_model.build_object_cache()
 
-        self._object_cache, self._id_to_ref_map = (
-            self.__class__._object_cache,
-            self.__class__._id_to_ref_map,
+        self.object_cache, self.id_to_ref_map = (
+            gts.object_cache,
+            gts.id_to_ref_map,
         )
 
     def in_memory_cache_has_expected_number_of_members_test(self):
-        self.assertEqual(3, len(self._object_cache.keys()))
-        self.assertEqual(2, len(self._id_to_ref_map.keys()))
+        self.assertEqual(3, len(self.object_cache.keys()))
+        self.assertEqual(2, len(self.id_to_ref_map.keys()))
 
     def in_memory_ref_map_is_identical_to_non_cached_test(self):
         self.assertEqual(
             self._test_model.find('test_record_one')['version'],
-            self._id_to_ref_map['test_record_one'],
+            self.id_to_ref_map['test_record_one'],
         )
 
         self.assertEqual(
             self._test_model.find('test_record_two')['version'],
-            self._id_to_ref_map['test_record_two'],
+            self.id_to_ref_map['test_record_two'],
         )
 
     def in_memory_object_cache_by_version_retrieves_correct_records(self):

@@ -71,7 +71,7 @@ class GitRecordFactory(object):
         models = []
         for b in tree.blobs:
             loaded_record = _load_record_from_blob(b, commit)
-            models.append(record_model(loaded_record, self))
+            models.append(record_model(loaded_record))
 
         return models
 
@@ -104,9 +104,10 @@ class GitRecordFactory(object):
         return [self._repo.rev_parse(c) for c in hexshas]
 
     def _verify_model_exists(self, record_model):
+        if record_model.__modelname__ in self._ignored:
+            raise ModelIgnored("That model exists, but is ignored by .gitrecord_ignore")
+
         try:
-            if record_model.__modelname__ in self._ignored:
-                raise ModelIgnored("That model exists, but is ignored by .gitrecord_ignore")
 
             self._repo.head.commit.tree[record_model.__modelname__]
         except KeyError:
@@ -144,7 +145,7 @@ class GitRecordFactory(object):
                 blob = commit.tree[path]
                 if blob.hexsha == version:
                     loaded_record = _load_record_from_blob(blob, commit)
-                    return record_model(loaded_record, self)
+                    return record_model(loaded_record)
 
         elif all_versions:
             commits = self._get_all_commits_for_path(path)
@@ -155,7 +156,7 @@ class GitRecordFactory(object):
             for commit in commits:
                 blob = commit.tree[path]
                 loaded_record = _load_record_from_blob(blob, commit)
-                records.append(record_model(loaded_record, self))
+                records.append(record_model(loaded_record))
 
             return records
 
@@ -165,7 +166,7 @@ class GitRecordFactory(object):
         try:
             blob = commit.tree[path]
             loaded_record = _load_record_from_blob(blob, commit)
-            record = record_model(loaded_record, self)
+            record = record_model(loaded_record)
         except KeyError:
             raise self._no_result_found("No record found with that id")
 
@@ -241,5 +242,6 @@ class GitRecord(dict):
 __all__ = [
     GitRecord,
     GitRecordFactory,
+    ModelIgnored,
     NoResultFound,
 ]
