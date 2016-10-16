@@ -326,8 +326,8 @@ class GitRecord(dict):
         return cls.get_factory().find(cls, *args, **kwargs)
 
     @classmethod
-    def get_version(self, *args, **kwargs):
-        return self.get_factory().get_version(*args, **kwargs)
+    def get_version(cls, *args, **kwargs):
+        return cls.get_factory().get_version(*args, **kwargs)
 
     @classmethod
     def build_object_cache(cls, *args, **kwargs):
