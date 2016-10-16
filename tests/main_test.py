@@ -340,7 +340,7 @@ class InvalidJSONTest(GitLarderTest):
     def _write_raw_to_invalid_record(self, data):
         file_path = os.path.join(self._test_repo_path, 'test_model', 'invalid.json')
 
-        with file(file_path, 'w') as f:
+        with open(file_path, 'w') as f:
             f.write(data)
 
         self._test_repo.index.add(['test_model/invalid.json'])

@@ -44,7 +44,7 @@ def chunk_into_groups_of(n, iterable, padvalue=None):
     return zip_longest(*[iter(iterable)] * n, fillvalue=padvalue)
 
 
-class NoResultFound(StandardError):
+class NoResultFound(Exception):
     def __init__(self, *args, **kwargs):
         last_version = kwargs.pop('last_version', None)
         super(NoResultFound, self).__init__(*args, **kwargs)
@@ -75,8 +75,18 @@ def _blob_to_cache_key(blob):
 
 
 def version_to_cache_key(plan_id, version):
+    try:
+        plan_id = plan_id.encode('utf8')
+    except AttributeError:
+        pass
+
+    try:
+        version = version.encode('utf8')
+    except AttributeError:
+        pass
+
     h = sha1()
-    h.update(plan_id.encode('utf8') + version.encode('utf8'))
+    h.update(plan_id + version)
 
     return h.hexdigest()
 
