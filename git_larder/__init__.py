@@ -256,7 +256,7 @@ class GitRecordFactory(object):
             blob = commit.tree[path]
             loaded_record = _load_record_from_blob(blob, commit)
             record = record_model(loaded_record)
-        except KeyError:
+        except (KeyError, ValueError):
             last_commit = self._get_last_commit_for_deleted_path(path)
             if last_commit:
                 blob = last_commit.tree[path]

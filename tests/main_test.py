@@ -16,14 +16,11 @@ limitations under the License.
 from __future__ import print_function
 from __future__ import unicode_literals
 
-import atexit
 import os
 import tempfile
 import time
 import unittest
 import shutil
-
-from errno import ENOENT
 
 try:
     import json as json
@@ -44,6 +41,15 @@ class GlobalTestState(object):
 
 
 gts = GlobalTestState()
+
+
+def get_raw_json_from_record(repo, record_id):
+    blob = repo.head.commit.tree['test_model/%s.json' % record_id]
+    return json.loads(blob.data_stream.read().decode('utf8'))
+
+
+def record_to_cache_key(record):
+    return version_to_cache_key(record['id'], record['version'])
 
 
 def maybe_make_test_repo():
@@ -84,7 +90,19 @@ def maybe_make_test_repo():
     with open(os.path.join(test_repo_path, 'test_model', 'test_record_one.json'), 'w') as f:
         json.dump(json_blob, f)
     test_repo.index.add(['test_model/test_record_one.json'])
-    test_repo.index.commit('Commit after create')
+    test_repo.index.commit("Commit after create")
+
+    test_repo.index.remove(['test_model/deleteme.json'])
+    test_repo.index.commit("Commit after test remove")
+
+    os.rename(
+        os.path.join(test_repo_path, 'test_model/moveme.json'),
+        os.path.join(test_repo_path, 'test_model/movedme.json'),
+    )
+    test_repo.index.remove(['test_model/moveme.json'])
+    test_repo.index.add(['test_model/movedme.json'])
+
+    test_repo.index.commit("Commit after test move")
 
     gts.temp_path, gts.test_repo, gts.test_repo_path = temp_path, test_repo, test_repo_path
 
@@ -95,14 +113,7 @@ def maybe_unmake_test_repo():
     if not gts.temp_path:
         return
 
-    try:
-        shutil.rmtree(gts.temp_path)
-        gts.temp_path = None
-    except OSError as e:
-        if e.errno == ENOENT:
-            gts.temp_path = None
-        else:
-            print("Wasn't able to unmake temp dir %s" % gts.temp_path)
+    shutil.rmtree(gts.temp_path, ignore_errors=True)
 
 
 def setUpModule():
@@ -209,6 +220,19 @@ class GitLarderTest(unittest.TestCase):
             )
         )
 
+    def model_find_deleted_test(self):
+        with self.assertRaises(NoResultFound) as cm:
+            self._test_model.find('deleteme')
+
+        self.assertIsNotNone(cm.exception.last_version)
+        self.assertEqual('deleteme', cm.exception.last_version['id'])
+
+    def model_find_moved_test(self):
+        with self.assertRaises(NoResultFound):
+            self._test_model.find('moveme')
+
+        self.assertGreater(len(self._test_model.find('movedme', all_versions=True)), 1)
+
 
 class GitLarderVersionComparisonTest(GitLarderTest):
     def setUp(self):
@@ -256,8 +280,8 @@ class InMemoryCacheTest(GitLarderTest):
         )
 
     def in_memory_cache_has_expected_number_of_members_test(self):
-        self.assertEqual(3, len(self.object_cache.keys()))
-        self.assertEqual(2, len(self.id_to_ref_map.keys()))
+        self.assertEqual(8, len(self.object_cache.keys()))
+        self.assertEqual(5, len(self.id_to_ref_map.keys()))
 
     def in_memory_ref_map_is_identical_to_non_cached_test(self):
         self.assertEqual(
@@ -270,10 +294,10 @@ class InMemoryCacheTest(GitLarderTest):
             self.id_to_ref_map['test_record_two'],
         )
 
-    def version_to_cache_key_is_fine_with_bytes(self):
+    def version_to_cache_key_is_fine_with_bytes_test(self):
         self.assertIsNotNone(version_to_cache_key(b'fake_record', b'fake_version'))
 
-    def in_memory_object_cache_by_version_retrieves_correct_records(self):
+    def in_memory_object_cache_by_version_retrieves_correct_records_test(self):
         test_record_one_all_versions = self._test_model.find(
             'test_record_one',
             all_versions=True)
@@ -289,13 +313,90 @@ class InMemoryCacheTest(GitLarderTest):
 
         self.assertEqual(
             test_record_one_earliest,
-            self._object_cache[test_record_one_earliest['version']],
+            self.object_cache[record_to_cache_key(test_record_one_earliest)],
         )
 
         self.assertEqual(
             test_record_one_latest,
-            self._object_cache[test_record_one_latest['version']],
+            self.object_cache[record_to_cache_key(test_record_one_latest)],
         )
+
+    def cache_keys_are_not_identical_for_identical_content_test(self):
+        r1_raw_json = get_raw_json_from_record(self._test_repo, 'identical1')
+        r2_raw_json = get_raw_json_from_record(self._test_repo, 'identical2')
+
+        self.assertEqual(r1_raw_json, r2_raw_json)
+
+        r1 = self._test_model.find('identical1')
+        r2 = self._test_model.find('identical2')
+
+        ref_record_1 = record_to_cache_key(r1)
+        ref_record_2 = record_to_cache_key(r2)
+
+        self.assertNotEqual(ref_record_1, ref_record_2)
+
+
+class InvalidJSONTest(GitLarderTest):
+    def _write_raw_to_invalid_record(self, data):
+        file_path = os.path.join(self._test_repo_path, 'test_model', 'invalid.json')
+
+        with file(file_path, 'w') as f:
+            f.write(data)
+
+        self._test_repo.index.add(['test_model/invalid.json'])
+
+    def setUp(self):
+        super(InvalidJSONTest, self).setUp()
+
+        self._write_raw_to_invalid_record('{"invalid": 1')
+        self._test_repo.index.commit('Initialize bad record')
+
+    def find_with_invalid_record_returns_no_result_test(self):
+        with self.assertRaises(NoResultFound):
+            self._test_model.find('invalid')
+
+    def find_with_valid_record_returns_result_when_invalid_exists_test(self):
+        try:
+            self.assertIsNotNone(self._test_model.find('test_record_one'))
+        except NoResultFound:
+            self.fail("Valid record query should not raise exception")
+
+    def find_with_valid_record_with_invalid_previous_version_test(self):
+        self._write_raw_to_invalid_record('{"valid": 1}')
+        self._test_repo.index.commit("Change invalid record to valid")
+
+        try:
+            self._test_model.find('invalid')
+        except NoResultFound:
+            self.fail("Valid record query with invalid version in history should not raise")
+
+    def find_all_versions_with_valid_record_with_invalid_previous_version_test(self):
+        self._write_raw_to_invalid_record('{"valid": 1}')
+        self._test_repo.index.commit("Change invalid record to valid")
+
+        try:
+            self.assertEqual(1, len(self._test_model.find('invalid', all_versions=True)))
+        except NoResultFound:
+            self.fail("Valid record query with invalid version in history should not raise")
+
+    def build_cache_with_invalid_version_at_head_fails_test(self):
+        with self.assertRaises(ValueError):
+            self._test_datastore.build_object_cache(self._test_model)
+
+    def build_cache_with_invalid_version_in_history_succeeds_test(self):
+        self._write_raw_to_invalid_record('{"valid": 1}')
+        self._test_repo.index.commit("Change invalid record to valid")
+
+        self._test_datastore.build_object_cache(self._test_model)
+
+    def record_does_not_populate_last_version_after_delete_if_last_version_was_invalid_test(self):
+        self._test_repo.index.remove(['test_model/invalid.json'])
+        self._test_repo.index.commit("Delete invalid blob")
+
+        try:
+            self._test_model.find("invalid")
+        except NoResultFound as e:
+            self.assertIsNone(e.last_version)
 
 
 if __name__ == '__main__':
