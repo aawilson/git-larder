@@ -8,9 +8,6 @@ here = path.abspath(path.dirname(__file__))
 with open(path.join(here, 'VERSION')) as v:
     VERSION = v.readline().strip()
 
-with open(path.join(here, 'requirements.txt')) as reqs_file:
-    requirements = reqs_file.read().splitlines()
-
 with open(path.join(here, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
@@ -50,7 +47,7 @@ setup(
     ],
     keywords='git storage nosql',
     packages=find_packages(exclude=['docs', 'tests']),
-    install_requires=requirements,
+    install_requires=['GitPython>=0.3.0'],
     extras_require={
         'test': ['nosetests'],
     },
