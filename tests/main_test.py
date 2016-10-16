@@ -31,7 +31,7 @@ except ImportError:
     import json
 
 from git import Repo
-from git_larder import GitRecord, GitRecordFactory, ModelIgnored, NoResultFound
+from git_larder import GitRecord, GitRecordFactory, ModelIgnored, NoResultFound, version_to_cache_key
 
 
 class GlobalTestState(object):
@@ -261,14 +261,17 @@ class InMemoryCacheTest(GitLarderTest):
 
     def in_memory_ref_map_is_identical_to_non_cached_test(self):
         self.assertEqual(
-            self._test_model.find('test_record_one')['version'],
+            version_to_cache_key('test_record_one', self._test_model.find('test_record_one')['version']),
             self.id_to_ref_map['test_record_one'],
         )
 
         self.assertEqual(
-            self._test_model.find('test_record_two')['version'],
+            version_to_cache_key('test_record_two', self._test_model.find('test_record_two')['version']),
             self.id_to_ref_map['test_record_two'],
         )
+
+    def version_to_cache_key_is_fine_with_bytes(self):
+        self.assertIsNotNone(version_to_cache_key(b'fake_record', b'fake_version'))
 
     def in_memory_object_cache_by_version_retrieves_correct_records(self):
         test_record_one_all_versions = self._test_model.find(
