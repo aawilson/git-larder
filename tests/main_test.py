@@ -23,6 +23,8 @@ import time
 import unittest
 import shutil
 
+from errno import ENOENT
+
 try:
     import json as json
 except ImportError:
@@ -79,7 +81,8 @@ def maybe_make_test_repo():
     blob = test_repo.head.commit.tree['test_model/test_record_one.json']
     json_blob = json.load(blob.data_stream)
     json_blob['a_changed_attribute'] = 'some_changed_value'
-    json.dump(json_blob, file(os.path.join(test_repo_path, 'test_model', 'test_record_one.json'), 'w'))
+    with open(os.path.join(test_repo_path, 'test_model', 'test_record_one.json'), 'w') as f:
+        json.dump(json_blob, f)
     test_repo.index.add(['test_model/test_record_one.json'])
     test_repo.index.commit('Commit after create')
 
@@ -89,12 +92,25 @@ def maybe_make_test_repo():
 
 
 def maybe_unmake_test_repo():
-    if gts.temp_path:
+    if not gts.temp_path:
+        return
+
+    try:
         shutil.rmtree(gts.temp_path)
         gts.temp_path = None
+    except OSError as e:
+        if e.errno == ENOENT:
+            gts.temp_path = None
+        else:
+            print("Wasn't able to unmake temp dir %s" % gts.temp_path)
 
 
-atexit.register(maybe_unmake_test_repo)
+def setUpModule():
+    maybe_make_test_repo()
+
+
+def tearDownModule():
+    maybe_unmake_test_repo()
 
 
 class GitLarderTest(unittest.TestCase):
