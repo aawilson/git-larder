@@ -79,7 +79,7 @@ def maybe_make_test_repo():
 
     time.sleep(1)  # To ensure commit time changes
     blob = test_repo.head.commit.tree['test_model/test_record_one.json']
-    json_blob = json.load(blob.data_stream)
+    json_blob = json.loads(blob.data_stream.read().decode('utf8'))
     json_blob['a_changed_attribute'] = 'some_changed_value'
     with open(os.path.join(test_repo_path, 'test_model', 'test_record_one.json'), 'w') as f:
         json.dump(json_blob, f)

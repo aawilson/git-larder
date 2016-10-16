@@ -42,7 +42,7 @@ def _id_from_blob(blob):
 
 
 def _load_record_from_blob(blob, commit):
-    loaded_record = json.load(blob.data_stream)
+    loaded_record = json.loads(blob.data_stream.read().decode('utf8'))
     loaded_record.update({
         'id': _id_from_blob(blob),
         'version': blob.hexsha,
@@ -58,7 +58,8 @@ class GitRecordFactory(object):
         self._git = Git(repo_location)
         self._no_result_found = no_result_found_error_class or NoResultFound
         try:
-            self._ignored = [line.strip() for line in self._repo.head.commit.tree['.gitrecord_ignore'].data_stream.read().split('\n')]
+            for line in self._repo.head.commit.tree['.gitrecord_ignore'].data_stream.read().decode('utf8').split('\n'):
+                self._ignored = line.strip()
         except KeyError:
             self._ignored = []
 
@@ -217,7 +218,8 @@ class GitRecord(dict):
     def reload(self):
         self._factory.reset(self)
         name = self['id']
-        for k in self.keys():
+
+        for k in list(self.keys()):
             del self[k]
 
         self.update(self._factory.find(self.__class__, name=name))
