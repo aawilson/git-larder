@@ -44,8 +44,11 @@ def chunk_into_groups_of(n, iterable, padvalue=None):
     return zip_longest(*[iter(iterable)] * n, fillvalue=padvalue)
 
 
-class NoResultFound(KeyError):
-    pass
+class NoResultFound(StandardError):
+    def __init__(self, *args, **kwargs):
+        last_version = kwargs.pop('last_version', None)
+        super(NoResultFound, self).__init__(*args, **kwargs)
+        self.last_version = last_version
 
 
 class ModelIgnored(KeyError):
