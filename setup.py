@@ -9,7 +9,7 @@ with open(path.join(here, 'VERSION')) as v:
     VERSION = v.readline().strip()
 
 with open(path.join(here, 'README.md'), encoding='utf-8') as f:
-    long_description = f.read()
+    long_description = '\n'.join([l.strip() for l in f.readlines()])
 
 setup(
     name="GitLarder",

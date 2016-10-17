@@ -1,1 +1,1 @@
-recursive-include test/test_repo
+recursive-include tests/test_repo *
