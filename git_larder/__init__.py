@@ -173,10 +173,10 @@ class GitRecordFactory(object):
             if status in ['A', 'M']:
                 hexshas_with_paths.append((commit_hash, path_or_paths))
             elif status in ['C', 'R']:
-                changed_from, changed_to = path_or_paths.split('\t')
+                _changed_from, changed_to = path_or_paths.split('\t')
                 hexshas_with_paths.append((commit_hash, changed_to))
 
-        return [(self._repo.rev_parse(c), p) for c, p in hexshas_with_paths]
+        return [(r_p, pa) for (r_p, pa) in ((self._repo.rev_parse(c), p) for c, p in hexshas_with_paths) if r_p is not None]
 
     def _get_last_commit_for_deleted_path(self, path):
         raw_output = self._git.log('--pretty=%H', '--name-only', '--diff-filter=D')
