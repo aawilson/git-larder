@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "GitLarder"
+description = "Python NoSQL Implementation on top of git"
+urls = {github="https://github.com/aawilson/git-larder"}
+authors = [{name="Aaron Wilson", email="aaron@olark.com"}]
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+classifiers = [
+    "Development Status :: 7 - Inactive",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Operating System :: POSIX",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: MacOS :: MacOS X",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 2",
+    "Programming Language :: Python :: 2.6",
+    "Programming Language :: Python :: 2.7",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.3",
+    "Programming Language :: Python :: 3.4",
+    "Programming Language :: Python :: 3.5",
+]
+keywords = ["git", "storage", "nosql"]
+dependencies = [
+    "GitPython>=0.3.0"
+    ]
+dynamic = ["readme", "version" ]
+
+
+[project.optional-dependencies]
+test = ["nosetests"]
+
+
+[tool.setuptools.dynamic]
+version = {file = "VERSION"}
+readme = {file = "README.md"}
+
+[tool.setuptools.packages.find]
+exclude = ["tests"]
